@@ -1,5 +1,6 @@
 import {
   AI_API_KEY,
+  AI_PROVIDER,
   EXTRA_API_HEADERS,
   RESPONSES_API_ENDPOINT,
   resolveModelForProvider
@@ -9,25 +10,48 @@ import { extractResponseText, toMessage } from "./helpers.js";
 const MODEL = resolveModelForProvider("gpt-5.2");
 
 async function chat(input, history = []) {
-  const response = await fetch(RESPONSES_API_ENDPOINT, {
+  const isGemini = AI_PROVIDER === "gemini";
+  const url = isGemini 
+    ? `${RESPONSES_API_ENDPOINT}?key=${AI_API_KEY}`
+    : RESPONSES_API_ENDPOINT;
+
+  const headers = isGemini 
+    ? { "Content-Type": "application/json" }
+    : {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${AI_API_KEY}`,
+        ...EXTRA_API_HEADERS
+      };
+
+  const body = isGemini
+    ? {
+        contents: [...history, toMessage("user", input)].map(m => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }]
+        }))
+      }
+    : {
+        model: MODEL,
+        input: [...history, toMessage("user", input)],
+        reasoning: { effort: "medium" }
+      };
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${AI_API_KEY}`,
-      ...EXTRA_API_HEADERS
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      input: [...history, toMessage("user", input)],
-      reasoning: { effort: "medium" }
-    })
+    headers,
+    body: JSON.stringify(body)
   });
 
   const data = await response.json();
+  console.log(data);
 
-  if (!response.ok || data.error) {
+  if (!response.ok || (data.error && !isGemini)) {
     const message = data?.error?.message ?? `Request failed with status ${response.status}`;
     throw new Error(message);
+  }
+  
+  if (isGemini && data.error) {
+      throw new Error(data.error.message);
   }
 
   const text = extractResponseText(data);

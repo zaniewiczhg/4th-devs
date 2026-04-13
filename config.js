@@ -20,7 +20,7 @@ const CHAT_API_BASE_URLS = {
 const OPENROUTER_ONLINE_SUFFIX = ":online";
 const VALID_OPENAI_SEARCH_CONTEXT_SIZES = new Set(["low", "medium", "high"]);
 const VALID_OPENROUTER_WEB_ENGINES = new Set(["native", "exa"]);
-const VALID_PROVIDERS = new Set(["openai", "openrouter"]);
+const VALID_PROVIDERS = new Set(["openai", "openrouter", "gemini"]);
 
 const [major] = process.versions.node.split(".").map(Number);
 if (major < MIN_NODE_VERSION) {
@@ -89,12 +89,14 @@ loadEnvFile(ROOT_ENV_FILE);
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() ?? "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim() ?? "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() ?? "";
 const requestedProvider = process.env.AI_PROVIDER?.trim().toLowerCase() ?? "";
 const hasOpenAIKey = Boolean(OPENAI_API_KEY);
 const hasOpenRouterKey = Boolean(OPENROUTER_API_KEY);
+const hasGeminiKey = Boolean(GEMINI_API_KEY);
 
 if (requestedProvider && !VALID_PROVIDERS.has(requestedProvider)) {
-  console.error("\x1b[31mError: AI_PROVIDER must be one of: openai, openrouter\x1b[0m");
+  console.error("\x1b[31mError: AI_PROVIDER must be one of: openai, openrouter, gemini\x1b[0m");
   process.exit(1);
 }
 
@@ -110,17 +112,27 @@ const resolveProvider = () => {
       process.exit(1);
     }
 
+    if (requestedProvider === "gemini" && !hasGeminiKey) {
+      console.error("\x1b[31mError: AI_PROVIDER=gemini requires GEMINI_API_KEY\x1b[0m");
+      process.exit(1);
+    }
+
     return requestedProvider;
   }
 
   if (hasOpenAIKey) return "openai";
   if (hasOpenRouterKey) return "openrouter";
+  if (hasGeminiKey) return "gemini";
   return "openai";
 };
 
 export const AI_PROVIDER = resolveProvider();
-export const AI_API_KEY = AI_PROVIDER === "openai" ? OPENAI_API_KEY : OPENROUTER_API_KEY;
-export const RESPONSES_API_ENDPOINT = RESPONSES_ENDPOINTS[AI_PROVIDER];
+export const AI_API_KEY = AI_PROVIDER === "openai" 
+  ? OPENAI_API_KEY 
+  : AI_PROVIDER === "gemini"
+    ? GEMINI_API_KEY
+    : OPENROUTER_API_KEY;
+export const RESPONSES_API_ENDPOINT = RESPONSES_ENDPOINTS[AI_PROVIDER] ?? (AI_PROVIDER === "gemini" ? "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash-lite:streamGenerateContent" : "");
 export const EMBEDDINGS_API_ENDPOINT = EMBEDDINGS_ENDPOINTS[AI_PROVIDER];
 export const CHAT_API_BASE_URL = CHAT_API_BASE_URLS[AI_PROVIDER];
 export const OPENROUTER_EXTRA_HEADERS = {

@@ -1,4 +1,20 @@
 export const extractResponseText = (data) => {
+  // Check if data is an array (streaming response format)
+  if (Array.isArray(data)) {
+    let fullText = "";
+    for (const chunk of data) {
+      if (chunk?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        fullText += chunk.candidates[0].content.parts[0].text;
+      }
+    }
+    if (fullText) return fullText;
+  }
+
+  // Handle single object responses
+  if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    return data.candidates[0].content.parts[0].text;
+  }
+
   if (typeof data?.output_text === "string" && data.output_text.trim()) {
     return data.output_text;
   }
@@ -14,4 +30,4 @@ export const extractResponseText = (data) => {
   return textPart?.text ?? "";
 };
 
-export const toMessage = (role, content) => ({ type: "message", role, content });
+export const toMessage = (role, content) => ({ role: role === "assistant" ? "model" : role, content });
