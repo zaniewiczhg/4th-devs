@@ -36,6 +36,8 @@ async function chat(input, history = []) {
         reasoning: { effort: "medium" }
       };
 
+  console.log(JSON.stringify(body));
+  console.log("----------------");
   const response = await fetch(url, {
     method: "POST",
     headers,
